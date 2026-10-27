@@ -26,7 +26,8 @@ Metrics are calculated only for pairs with both an actual and a qualifying forec
 | `frontend/src/utils/exportCsv.js` | Creates and downloads the interval CSV file. |
 | `frontend/src/styles.css` | Shared dashboard styles and responsive layouts for all components. |
 | `frontend/src/main.jsx` | React application entry point. |
-| `frontend/` | Vite configuration, dependencies, Docker build, and Nginx production configuration. |
+| `frontend/nginx.conf.template` | Proxies browser API requests to the configured backend service URL. |
+| `frontend/` | Vite configuration, dependencies, and frontend Docker build. |
 | `backend/app/main.py` | FastAPI routes, Elexon retrieval, forecast selection, and error scoring. |
 | `backend/tests/test_analysis.py` | Tests for forecast selection, metrics, and Elexon request windows. |
 | `docker-compose.yml` | Starts the backend API and production frontend. |
@@ -100,6 +101,18 @@ If Elexon has no matching historical forecast vintage or the service is unavaila
 ## Architecture and review notes
 
 The browser calls a same-origin `/api` route. FastAPI fetches only the two Elexon datasets, validates and filters records, chooses a qualifying forecast vintage per interval, and computes metrics. The React layer renders the response and does not calculate alternate metrics. The Docker frontend serves a built static bundle with Nginx and proxies `/api` to the backend service.
+
+### Connecting frontend and backend on Northflank
+
+Deploy the backend and frontend as separate services from the same repository:
+
+1. Deploy the backend with build context `/backend` and Dockerfile `/backend/Dockerfile`. Expose container port `8000` as HTTP and wait until the deployment is healthy.
+2. Copy the backend's public HTTP(S) domain from the backend service's **Networking / Ports** settings. The public domain should open the API service root and show JSON links; check `/api/health` and confirm it returns `{"status":"ok"}`.
+3. Deploy the frontend with build context `/frontend` and Dockerfile `/frontend/Dockerfile`. Expose container port `80` as HTTP.
+4. In the frontend service's environment variables, set `BACKEND_URL` to the backend domain including `https://`, for example `https://your-backend-domain`. Do not add a path such as `/api` or a trailing slash.
+5. Redeploy the frontend after setting the variable. Open the frontend's public URL; its same-origin `/api` requests will be proxied to the backend.
+
+The local Docker Compose setup defaults `BACKEND_URL` to `http://backend:8000`, which uses the Compose service network. On Northflank, use the backend service's reachable domain instead of the local Compose hostname. If the frontend loads but shows a data error, first verify the backend's `/api/health` URL, then confirm `BACKEND_URL` is set on the frontend and redeploy it.
 
 AI tools were used to assist with creating this prototype. The code and data interpretation should be reviewed and validated before operational use.
 
