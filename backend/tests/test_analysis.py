@@ -1,9 +1,11 @@
+import asyncio
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
 
 from app.main import (
     build_publish_ranges,
     calculate_metrics,
+    root,
     select_forecast_vintages,
 )
 
@@ -11,6 +13,13 @@ UTC = timezone.utc
 
 
 class AnalysisTests(unittest.TestCase):
+    def test_root_explains_available_service_routes(self):
+        response = asyncio.run(root())
+
+        self.assertEqual(response["status"], "ok")
+        self.assertEqual(response["health"], "/api/health")
+        self.assertEqual(response["documentation"], "/docs")
+
     def test_selects_latest_forecast_published_before_cutoff(self):
         actuals = [
             {

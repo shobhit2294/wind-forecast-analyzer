@@ -171,6 +171,17 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/")
+async def root() -> dict[str, Any]:
+    return {
+        "service": "Northstar Wind Forecast API",
+        "status": "ok",
+        "health": "/api/health",
+        "analysis": "/api/analysis?deliveryDate=2026-01-15&cutoffTime=10:00",
+        "documentation": "/docs",
+    }
+
+
 @app.get("/api/analysis")
 async def analysis(
     delivery_date: date = Query(alias="deliveryDate"),

@@ -54,7 +54,7 @@ From the repository root:
 docker compose up --build
 ```
 
-Open [http://localhost:8080](http://localhost:8080). The API health check is at [http://localhost:8000/api/health](http://localhost:8000/api/health).
+Open [http://localhost:8080](http://localhost:8080). The backend service root explains its routes; the API health check is at [http://localhost:8000/api/health](http://localhost:8000/api/health), and interactive API documentation is at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 ### Local development
 
