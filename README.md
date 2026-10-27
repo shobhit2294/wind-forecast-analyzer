@@ -20,12 +20,29 @@ Metrics are calculated only for pairs with both an actual and a qualifying forec
 
 | Path | Purpose |
 |---|---|
-| `frontend/` | React/Vite dashboard, SVG visualization, styles, and Nginx production configuration. |
-| `backend/app/` | FastAPI routes and Elexon retrieval, selection, and scoring logic. |
-| `backend/tests/` | Unit tests for forecast-vintage selection and error calculations. |
+| `frontend/src/App.jsx` | Dashboard state, API request, and the page-level component layout. |
+| `frontend/src/components/` | One file per visible dashboard section: header, controls, error notice, metric cards, chart, trading insight, interval table, and footer. |
+| `frontend/src/utils/formatters.js` | Shared number, time, and request-error formatting helpers. |
+| `frontend/src/utils/exportCsv.js` | Creates and downloads the interval CSV file. |
+| `frontend/src/styles.css` | Shared dashboard styles and responsive layouts for all components. |
+| `frontend/src/main.jsx` | React application entry point. |
+| `frontend/` | Vite configuration, dependencies, Docker build, and Nginx production configuration. |
+| `backend/app/main.py` | FastAPI routes, Elexon retrieval, forecast selection, and error scoring. |
+| `backend/tests/test_analysis.py` | Tests for forecast selection, metrics, and Elexon request windows. |
 | `docker-compose.yml` | Starts the backend API and production frontend. |
 | `Dockerfile` files | Build the frontend and backend containers. |
 | `.env.example` | Optional Elexon API base URL configuration. |
+
+### Frontend component guide
+
+- `DashboardHeader.jsx` — brand, pilot status, and page title.
+- `DecisionControls.jsx` — delivery date, day-ahead cutoff, and scope note.
+- `ForecastSummary.jsx` and `MetricCard.jsx` — data coverage and accuracy metrics.
+- `ForecastChartPanel.jsx` and `WindChart.jsx` — chart heading, legend, and SVG plot.
+- `InsightsPanel.jsx` — signed-bias trading context.
+- `IntervalTable.jsx` — per-interval values and CSV export button.
+- `ErrorBanner.jsx` — visible API error message.
+- `PageFooter.jsx` — dashboard footer.
 
 ## Start the application
 
