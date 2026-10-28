@@ -3,13 +3,17 @@ import unittest
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
+from fastapi import HTTPException
 from fastapi.responses import FileResponse
 
 from app.main import (
+    _DATASET_CACHE,
+    analysis,
     build_publish_ranges,
     calculate_metrics,
+    fetch_dataset,
     root,
     select_forecast_vintages,
 )
@@ -123,6 +127,28 @@ class AnalysisTests(unittest.TestCase):
     def test_publish_ranges_include_a_zero_length_cutoff(self):
         cutoff = datetime(2025, 12, 31, tzinfo=UTC)
         self.assertEqual(build_publish_ranges(cutoff, cutoff), [(cutoff, cutoff)])
+
+    def test_analysis_rejects_dates_outside_january_decision_window(self):
+        with self.assertRaises(HTTPException) as context:
+            asyncio.run(analysis(delivery_date=date(2026, 3, 1), cutoff_time=time(10)))
+        self.assertEqual(context.exception.status_code, 422)
+
+    def test_dataset_caching(self):
+        mock_client = AsyncMock()
+        _DATASET_CACHE.clear()
+        _DATASET_CACHE["WINDFOR:2026-01-14T00:00:00+00:00:2026-01-14T10:00:00+00:00"] = [
+            {"test": 1}
+        ]
+        result = asyncio.run(
+            fetch_dataset(
+                mock_client,
+                "WINDFOR",
+                datetime(2026, 1, 14, 0, 0, tzinfo=UTC),
+                datetime(2026, 1, 14, 10, 0, tzinfo=UTC),
+            )
+        )
+        self.assertEqual(result, [{"test": 1}])
+        mock_client.get.assert_not_called()
 
 
 if __name__ == "__main__":

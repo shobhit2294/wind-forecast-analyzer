@@ -22,6 +22,8 @@ FRONTEND_DIST = Path(
 )
 FRONTEND_INDEX = FRONTEND_DIST / "index.html"
 
+_DATASET_CACHE: dict[str, list[dict[str, Any]]] = {}
+
 app = FastAPI(title="Northstar Wind Forecast API", version="1.0.0")
 if (FRONTEND_DIST / "assets").is_dir():
     app.mount(
@@ -140,7 +142,7 @@ def calculate_metrics(intervals: list[dict[str, Any]]) -> dict[str, float | int 
 def build_publish_ranges(
     start: datetime, end: datetime, max_range: timedelta = timedelta(days=7)
 ) -> list[tuple[datetime, datetime]]:
-    if start == end:
+    if start >= end:
         return [(start, end)]
     ranges: list[tuple[datetime, datetime]] = []
     current = start
@@ -157,6 +159,10 @@ async def fetch_dataset(
     publish_from: datetime,
     publish_to: datetime,
 ) -> list[dict[str, Any]]:
+    cache_key = f"{dataset}:{publish_from.isoformat()}:{publish_to.isoformat()}"
+    if cache_key in _DATASET_CACHE:
+        return _DATASET_CACHE[cache_key]
+
     try:
         response = await client.get(
             f"{ELEXON_API_BASE}/{dataset}",
@@ -172,7 +178,9 @@ async def fetch_dataset(
             detail=f"Elexon {dataset} request failed: {error}",
         ) from error
     try:
-        return records_from_payload(response.json())
+        records = records_from_payload(response.json())
+        _DATASET_CACHE[cache_key] = records
+        return records
     except (ValueError, TypeError) as error:
         raise HTTPException(
             status_code=502, detail=f"Invalid Elexon {dataset} response: {error}"
@@ -202,9 +210,12 @@ async def analysis(
     delivery_date: date = Query(alias="deliveryDate"),
     cutoff_time: time = Query(default=time(10), alias="cutoffTime"),
 ) -> dict[str, Any]:
-    if delivery_date.year != 2026 or delivery_date.month != 1:
+    is_jan_delivery = delivery_date.year == 2026 and delivery_date.month == 1
+    is_jan_decision_for_feb = delivery_date == date(2026, 2, 1)
+    if not (is_jan_delivery or is_jan_decision_for_feb):
         raise HTTPException(
-            status_code=422, detail="Delivery date must be in January 2026."
+            status_code=422,
+            detail="Delivery date must be in January 2026 (or 2026-02-01 for decisions made on 2026-01-31).",
         )
     if cutoff_time.tzinfo is not None:
         raise HTTPException(
@@ -214,8 +225,8 @@ async def analysis(
     cutoff_day = delivery_date - timedelta(days=1)
     cutoff = datetime.combine(cutoff_day, cutoff_time, tzinfo=UTC)
     actual_publish_from = datetime.combine(delivery_date, time.min, tzinfo=UTC)
-    actual_publish_to = actual_publish_from + timedelta(days=1)
-    forecast_publish_from = datetime(2025, 12, 31, tzinfo=UTC)
+    actual_publish_to = actual_publish_from + timedelta(days=1, minutes=30)
+    forecast_publish_from = max(datetime(2025, 12, 31, tzinfo=UTC), cutoff - timedelta(days=4))
     async with httpx.AsyncClient(timeout=30.0) as client:
         actuals, *forecast_batches = await asyncio.gather(
             fetch_dataset(client, "FUELHH", actual_publish_from, actual_publish_to),
@@ -233,7 +244,7 @@ async def analysis(
     if not intervals:
         raise HTTPException(
             status_code=404,
-            detail="Elexon returned no records for the selected January 2026 delivery date.",
+            detail="Elexon returned no records for the selected delivery date.",
         )
     return {
         "deliveryDate": delivery_date.isoformat(),

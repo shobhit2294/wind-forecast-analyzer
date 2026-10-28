@@ -4,8 +4,11 @@ export default function DecisionControls({
   onDeliveryDateChange,
   onCutoffTimeChange,
 }) {
-  const deliveryDayLabel = deliveryDate
-    ? new Date(`${deliveryDate}T00:00:00`).toLocaleDateString("en-GB", {
+  const cutoffDate = deliveryDate
+    ? new Date(new Date(`${deliveryDate}T00:00:00Z`).getTime() - 86400000)
+    : null;
+  const cutoffDayLabel = cutoffDate
+    ? cutoffDate.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         timeZone: "UTC",
@@ -27,7 +30,7 @@ export default function DecisionControls({
           <input
             type="date"
             min="2026-01-01"
-            max="2026-01-31"
+            max="2026-02-01"
             value={deliveryDate}
             onChange={(event) => onDeliveryDateChange(event.target.value)}
           />
@@ -42,7 +45,7 @@ export default function DecisionControls({
         </label>
         <div className="decision-hint">
           <span className="hint-arrow">↳</span> Forecast published by{" "}
-          <b>{deliveryDayLabel} {cutoffTime} UTC</b> on the preceding day
+          <b>{cutoffDayLabel} {cutoffTime} UTC</b> (D-1 decision cutoff)
         </div>
       </section>
 
