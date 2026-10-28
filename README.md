@@ -118,10 +118,11 @@ AI tools were used to assist with creating this prototype. The code and data int
 
 ## Deployment and submission
 
-No hosted deployment URL, public GitHub repository, or video has been created from this workspace. They require account access and actions outside the local project. Before submission:
+Repository: [github.com/shobhit2294/wind-forecast-analyzer](https://github.com/shobhit2294/wind-forecast-analyzer).
 
-1. Publish the repository under an anonymous name if required.
-2. Deploy the Dockerized app to a host that supports the backend and frontend containers (for example, Heroku); add the hosted URL here.
-3. Record a video of no more than 10 minutes: a client walkthrough (up to 5 minutes), followed by an internal technical walkthrough (up to 5 minutes).
-4. Open every submitted URL in a private/incognito browser window and verify access.
-5. Submit the repository, deployed app, and video links in the provided form.
+The backend has been configured as a Northflank service, but its public URL previously returned a connection-refused error. Treat the hosted app as **not yet verified** until the backend `/api/health` endpoint responds with `{"status":"ok"}` and the frontend dashboard successfully loads data through it. The frontend service, working hosted app URL, and demo video still need to be completed or verified before final submission.
+
+1. Make both Northflank services healthy and verify the frontend against the deployed backend.
+2. Record a video of no more than 10 minutes: a client walkthrough (up to 5 minutes), followed by an internal technical walkthrough (up to 5 minutes).
+3. Open every submitted URL in a private/incognito browser window and verify access.
+4. Submit the repository, deployed app, and video links in the provided form.
