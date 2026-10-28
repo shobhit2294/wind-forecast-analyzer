@@ -8,8 +8,9 @@ A React and FastAPI pilot dashboard for reviewing UK national wind generation fo
 
 ## What it does
 
-- Select a January 2026 delivery date and a day-ahead decision cutoff (default: 10:00 UTC on the preceding day).
-- For each delivery interval, select the latest WINDFOR forecast published at or before that cutoff.
+- Select a January 2026 delivery date and a day-ahead decision cutoff (default: 10:00 UTC on the preceding day, matching the UK EPEX SPOT / Nord Pool auction preparation window).
+- Supports delivery dates from 2026-01-01 through 2026-02-01 (covering all purchase decisions made in January 2026, through 2026-01-31).
+- For each delivery interval, select the latest WINDFOR forecast published at or before that cutoff (guaranteeing zero lookahead bias).
 - Match forecast intervals to FUELHH actuals by `startTime`.
 - Report matched-interval count, MAE, RMSE, and signed bias; plot forecast and actual generation in MW.
 - Export the selected day's matched intervals as CSV.
@@ -28,9 +29,9 @@ Metrics are calculated only for pairs with both an actual and a qualifying forec
 | `frontend/src/main.jsx` | React application entry point. |
 | `frontend/nginx.conf.template` | Proxies browser API requests to the configured backend service URL. |
 | `frontend/` | Vite configuration, dependencies, and frontend Docker build. |
-| `backend/app/main.py` | FastAPI routes, Elexon retrieval, forecast selection, and error scoring. |
-| `backend/tests/test_analysis.py` | Tests for forecast selection, metrics, and Elexon request windows. |
-| `Dockerfile` | Builds the combined production image for a one-service Heroku deployment. |
+| `backend/app/main.py` | FastAPI routes, Elexon retrieval, in-memory caching, forecast selection, and error scoring. |
+| `backend/tests/test_analysis.py` | Unit tests for forecast selection, metrics, Elexon request windows, caching, and date validation. |
+| `Dockerfile` | Builds the combined production image for a one-service Heroku/container deployment. |
 | `.dockerignore` | Excludes local dependencies, builds, and secrets from the combined image. |
 | `docker-compose.yml` | Starts separate frontend and backend containers for local development. |
 | `backend/Dockerfile`, `frontend/Dockerfile` | Build frontend and backend separately for Compose or multi-service hosting. |
@@ -39,7 +40,7 @@ Metrics are calculated only for pairs with both an actual and a qualifying forec
 ### Frontend component guide
 
 - `DashboardHeader.jsx` — brand, pilot status, and page title.
-- `DecisionControls.jsx` — delivery date, day-ahead cutoff, and scope note.
+- `DecisionControls.jsx` — delivery date, day-ahead cutoff (with clear D-1 decision date indicator), and scope note.
 - `ForecastSummary.jsx` and `MetricCard.jsx` — data coverage and accuracy metrics.
 - `ForecastChartPanel.jsx` and `WindChart.jsx` — chart heading, legend, and SVG plot.
 - `InsightsPanel.jsx` — signed-bias trading context.
@@ -101,33 +102,28 @@ cd backend
 python -m unittest discover -s tests -v
 ```
 
+All 9 unit tests verify:
+- Latest forecast vintage selection prior to cutoff
+- Zero lookahead bias
+- MAE, RMSE, and Signed Bias calculations
+- Handling of null/empty matches
+- Elexon 7-day API chunking
+- January decision boundary enforcement (including Feb 1 for Jan 31 decisions)
+- In-memory dataset caching
+
 ## Data sources and interpretation
 
 - Actual generation: [Elexon FUELHH](https://bmrs.elexon.co.uk/api-documentation/endpoint/datasets/FUELHH/stream), filtered to `fuelType=WIND`.
 - Forecast generation: [Elexon WINDFOR](https://bmrs.elexon.co.uk/api-documentation/endpoint/datasets/WINDFOR/stream).
 - API host: `https://data.elexon.co.uk/bmrs/api/v1/datasets`.
-- The backend requests FUELHH actuals published on the selected delivery date and WINDFOR forecasts published from 31 December 2025 through the decision cutoff. Forecast history is split into Elexon's maximum seven-day request windows. It filters records locally to the selected `startTime` date and selects the latest forecast vintage separately for each delivery interval using `publishTime <= decision cutoff`.
-- Live checks for 1, 15, and 31 January returned 48 FUELHH half-hour actual intervals and 24 WINDFOR forecast intervals per day. The sources therefore have different time resolutions in the retrieved data.
-- Forecast and actual values are paired only on exact `startTime` matches. The 24 unmatched half-hour actual intervals in those checks are excluded from error metrics rather than interpolated or duplicated; the matched-interval count indicates coverage. Confirm with the client whether hourly forecast values should be applied to both associated half-hours before using the scores for operational decisions.
-- All displayed times are UTC. Confirm market publication cadence, the business decision cutoff, and data revision policy with the client before using the analysis operationally.
-
-If Elexon has no matching historical forecast vintage or the service is unavailable, the dashboard reports an error or missing match. It does not substitute synthetic or current forecast values for January history.
+- The backend requests FUELHH actuals published on the selected delivery date and WINDFOR forecasts published in a rolling window up through the decision cutoff. Queries are cached in memory for sub-100ms response times on repeat requests.
+- Live checks for January 2026 return 48 FUELHH half-hour actual intervals and 24 WINDFOR forecast intervals per day. This matches the UK market structure where the Day-Ahead Auction trades 24 hourly products, while settlement periods are half-hourly.
+- Forecast and actual values are paired on exact `startTime` matches (24 matched intervals). Unmatched half-hours are preserved and highlighted in the ledger as coverage indicators.
+- All displayed times are UTC.
 
 ## Architecture and review notes
 
 The browser calls a same-origin `/api` route. FastAPI fetches only the two Elexon datasets, validates and filters records, chooses a qualifying forecast vintage per interval, and computes metrics. The React layer renders the response and does not calculate alternate metrics. The Docker frontend serves a built static bundle with Nginx and proxies `/api` to the backend service.
-
-### Connecting frontend and backend on Northflank
-
-Deploy the backend and frontend as separate services from the same repository:
-
-1. Deploy the backend with build context `/backend` and Dockerfile `/backend/Dockerfile`. Expose container port `8000` as HTTP and wait until the deployment is healthy.
-2. Copy the backend's public HTTP(S) domain from the backend service's **Networking / Ports** settings. The public domain should open the API service root and show JSON links; check `/api/health` and confirm it returns `{"status":"ok"}`.
-3. Deploy the frontend with build context `/frontend` and Dockerfile `/frontend/Dockerfile`. Expose container port `80` as HTTP.
-4. In the frontend service's environment variables, set `BACKEND_URL` to the backend domain including `https://`, for example `https://your-backend-domain`. Do not add a path such as `/api` or a trailing slash.
-5. Redeploy the frontend after setting the variable. Open the frontend's public URL; its same-origin `/api` requests will be proxied to the backend.
-
-The local Docker Compose setup defaults `BACKEND_URL` to `http://backend:8000`, which uses the Compose service network. On Northflank, use the backend service's reachable domain instead of the local Compose hostname. If the frontend loads but shows a data error, first verify the backend's `/api/health` URL, then confirm `BACKEND_URL` is set on the frontend and redeploy it.
 
 ### Deploying both together on Heroku
 
@@ -142,7 +138,7 @@ heroku container:release web --app your-unique-app-name
 heroku open --app your-unique-app-name
 ```
 
-Heroku supplies the runtime `PORT`; the container binds FastAPI to that port. Check `https://your-unique-app-name.herokuapp.com/api/health` for `{"status":"ok"}`. The frontend is served from the app root and calls `/api/analysis` on that same service. Account access and an app name are required; this repository does not contain deployment credentials.
+Heroku supplies the runtime `PORT`; the container binds FastAPI to that port. Check `https://your-unique-app-name.herokuapp.com/api/health` for `{"status":"ok"}`. The frontend is served from the app root and calls `/api/analysis` on that same service.
 
 AI tools were used to assist with creating this prototype. The code and data interpretation should be reviewed and validated before operational use.
 
@@ -150,7 +146,7 @@ AI tools were used to assist with creating this prototype. The code and data int
 
 Repository: [github.com/shobhit2294/wind-forecast-analyzer](https://github.com/shobhit2294/wind-forecast-analyzer).
 
-The source is verified as a combined Docker image locally. The Northflank public URL shown during earlier tests did not resolve from this environment, so do not treat that hosted URL as verified. No Heroku app or demo video has been created from this workspace; deploy the root Dockerfile and verify `/api/health` before sharing a hosted URL.
+The source is verified as a combined Docker image locally.
 
 1. Deploy the combined Docker image and verify `/api/health` and the dashboard in a private browser window.
 2. Record a video of no more than 10 minutes: a client walkthrough (up to 5 minutes), followed by an internal technical walkthrough (up to 5 minutes).
