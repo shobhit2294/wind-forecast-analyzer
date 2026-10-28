@@ -188,6 +188,7 @@ async def fetch_dataset(
 
 
 @app.get("/api/health")
+@app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
 
@@ -206,6 +207,7 @@ async def root() -> dict[str, Any] | FileResponse:
 
 
 @app.get("/api/analysis")
+@app.get("/analysis")
 async def analysis(
     delivery_date: date = Query(alias="deliveryDate"),
     cutoff_time: time = Query(default=time(10), alias="cutoffTime"),
