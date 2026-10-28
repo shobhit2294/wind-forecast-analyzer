@@ -1,6 +1,11 @@
 import asyncio
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
+from fastapi.responses import FileResponse
 
 from app.main import (
     build_publish_ranges,
@@ -19,6 +24,16 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(response["status"], "ok")
         self.assertEqual(response["health"], "/api/health")
         self.assertEqual(response["documentation"], "/docs")
+
+    def test_root_serves_react_entry_when_frontend_is_bundled(self):
+        with TemporaryDirectory() as directory:
+            index_file = Path(directory) / "index.html"
+            index_file.write_text("<html></html>", encoding="utf-8")
+            with patch("app.main.FRONTEND_INDEX", index_file):
+                response = asyncio.run(root())
+
+        self.assertIsInstance(response, FileResponse)
+        self.assertEqual(response.path, index_file)
 
     def test_selects_latest_forecast_published_before_cutoff(self):
         actuals = [

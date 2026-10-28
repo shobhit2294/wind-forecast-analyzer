@@ -30,9 +30,11 @@ Metrics are calculated only for pairs with both an actual and a qualifying forec
 | `frontend/` | Vite configuration, dependencies, and frontend Docker build. |
 | `backend/app/main.py` | FastAPI routes, Elexon retrieval, forecast selection, and error scoring. |
 | `backend/tests/test_analysis.py` | Tests for forecast selection, metrics, and Elexon request windows. |
-| `docker-compose.yml` | Starts the backend API and production frontend. |
-| `Dockerfile` files | Build the frontend and backend containers. |
-| `.env.example` | Optional Elexon API base URL configuration. |
+| `Dockerfile` | Builds the combined production image for a one-service Heroku deployment. |
+| `.dockerignore` | Excludes local dependencies, builds, and secrets from the combined image. |
+| `docker-compose.yml` | Starts separate frontend and backend containers for local development. |
+| `backend/Dockerfile`, `frontend/Dockerfile` | Build frontend and backend separately for Compose or multi-service hosting. |
+| `.env.example` | Example Elexon URL, frontend proxy URL, and local host ports. |
 
 ### Frontend component guide
 
@@ -58,6 +60,17 @@ docker compose up --build
 Open [http://localhost:8080](http://localhost:8080). The backend service root explains its routes; the API health check is at [http://localhost:8000/api/health](http://localhost:8000/api/health), and interactive API documentation is at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 If a host port is already in use, copy `.env.example` to `.env` and change `BACKEND_HOST_PORT` or `FRONTEND_HOST_PORT`. For example, setting them to `18000` and `18080` makes the app available at [http://localhost:18080](http://localhost:18080), with backend health at [http://localhost:18000/api/health](http://localhost:18000/api/health). These host port settings do not change the internal `8000` backend and `80` frontend ports used between containers.
+
+### One-container production check
+
+The root `Dockerfile` builds the React app and packages it with FastAPI in one image. FastAPI serves the React page at `/` and continues to serve analysis at `/api/analysis`, so the browser and API share one origin and require no separate backend URL.
+
+```powershell
+docker build -t wind-forecast-app .
+docker run --rm -p 18001:8000 wind-forecast-app
+```
+
+Open [http://localhost:18001](http://localhost:18001) and verify [http://localhost:18001/api/health](http://localhost:18001/api/health) returns `{"status":"ok"}`. Choose another unused host port instead of `18001` if necessary.
 
 ### Local development
 
@@ -116,15 +129,30 @@ Deploy the backend and frontend as separate services from the same repository:
 
 The local Docker Compose setup defaults `BACKEND_URL` to `http://backend:8000`, which uses the Compose service network. On Northflank, use the backend service's reachable domain instead of the local Compose hostname. If the frontend loads but shows a data error, first verify the backend's `/api/health` URL, then confirm `BACKEND_URL` is set on the frontend and redeploy it.
 
+### Deploying both together on Heroku
+
+Use the **root `Dockerfile`** to deploy one web service containing both React and FastAPI. This avoids separate-service ports and frontend-to-backend DNS configuration. Install the Heroku CLI, sign in, and use a unique app name:
+
+```powershell
+heroku login
+heroku create your-unique-app-name
+heroku container:login
+heroku container:push web --app your-unique-app-name
+heroku container:release web --app your-unique-app-name
+heroku open --app your-unique-app-name
+```
+
+Heroku supplies the runtime `PORT`; the container binds FastAPI to that port. Check `https://your-unique-app-name.herokuapp.com/api/health` for `{"status":"ok"}`. The frontend is served from the app root and calls `/api/analysis` on that same service. Account access and an app name are required; this repository does not contain deployment credentials.
+
 AI tools were used to assist with creating this prototype. The code and data interpretation should be reviewed and validated before operational use.
 
 ## Deployment and submission
 
 Repository: [github.com/shobhit2294/wind-forecast-analyzer](https://github.com/shobhit2294/wind-forecast-analyzer).
 
-The backend has been configured as a Northflank service, but its public URL previously returned a connection-refused error. Treat the hosted app as **not yet verified** until the backend `/api/health` endpoint responds with `{"status":"ok"}` and the frontend dashboard successfully loads data through it. The frontend service, working hosted app URL, and demo video still need to be completed or verified before final submission.
+The source is verified as a combined Docker image locally. The Northflank public URL shown during earlier tests did not resolve from this environment, so do not treat that hosted URL as verified. No Heroku app or demo video has been created from this workspace; deploy the root Dockerfile and verify `/api/health` before sharing a hosted URL.
 
-1. Make both Northflank services healthy and verify the frontend against the deployed backend.
+1. Deploy the combined Docker image and verify `/api/health` and the dashboard in a private browser window.
 2. Record a video of no more than 10 minutes: a client walkthrough (up to 5 minutes), followed by an internal technical walkthrough (up to 5 minutes).
 3. Open every submitted URL in a private/incognito browser window and verify access.
 4. Submit the repository, deployed app, and video links in the provided form.

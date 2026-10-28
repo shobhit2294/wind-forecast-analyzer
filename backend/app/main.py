@@ -4,18 +4,31 @@ import asyncio
 import os
 from datetime import date, datetime, time, timedelta, timezone
 from math import sqrt
+from pathlib import Path
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 UTC = timezone.utc
 ELEXON_API_BASE = os.getenv(
     "ELEXON_API_BASE", "https://data.elexon.co.uk/bmrs/api/v1/datasets"
 ).rstrip("/")
+FRONTEND_DIST = Path(
+    os.getenv("FRONTEND_DIST", str(Path(__file__).resolve().parents[2] / "static"))
+)
+FRONTEND_INDEX = FRONTEND_DIST / "index.html"
 
 app = FastAPI(title="Northstar Wind Forecast API", version="1.0.0")
+if (FRONTEND_DIST / "assets").is_dir():
+    app.mount(
+        "/assets",
+        StaticFiles(directory=FRONTEND_DIST / "assets"),
+        name="frontend-assets",
+    )
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -171,8 +184,10 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/")
-async def root() -> dict[str, Any]:
+@app.get("/", response_model=None)
+async def root() -> dict[str, Any] | FileResponse:
+    if FRONTEND_INDEX.is_file():
+        return FileResponse(FRONTEND_INDEX)
     return {
         "service": "Northstar Wind Forecast API",
         "status": "ok",
