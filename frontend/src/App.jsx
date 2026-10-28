@@ -28,9 +28,29 @@ export default function App() {
       { signal: controller.signal },
     )
       .then(async (response) => {
-        const body = await response.json();
+        const responseText = await response.text();
+        let body = null;
+        if (responseText) {
+          try {
+            body = JSON.parse(responseText);
+          } catch {
+            if (response.ok) {
+              throw new Error(
+                "The analysis API returned an unreadable response. Check that the backend is running.",
+              );
+            }
+          }
+        }
         if (!response.ok) {
-          throw new Error(body.detail || "The analysis request failed.");
+          throw new Error(
+            body?.detail ||
+              `The analysis API returned HTTP ${response.status}. Check that the backend is running and reachable.`,
+          );
+        }
+        if (!body) {
+          throw new Error(
+            "The analysis API returned an empty response. Check that the backend is running.",
+          );
         }
         return body;
       })
