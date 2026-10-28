@@ -132,9 +132,11 @@ AI tools were used to assist with creating this prototype. The code and data int
 
 ## Deployment and submission
 
-Repository: [github.com/shobhit2294/wind-forecast-analyzer](https://github.com/shobhit2294/wind-forecast-analyzer).
+- **Live Application**: [https://wind-forecast-analyzer-tuu4.vercel.app](https://wind-forecast-analyzer-tuu4.vercel.app)
+- **API Health Check**: [https://wind-forecast-analyzer-tuu4.vercel.app/api/health](https://wind-forecast-analyzer-tuu4.vercel.app/api/health)
+- **Repository**: [https://github.com/shobhit2294/wind-forecast-analyzer](https://github.com/shobhit2294/wind-forecast-analyzer)
 
-1. Deploy the app to Vercel and verify `/api/health` and the dashboard in a private browser window.
+1. Verify `/api/health` and the dashboard in a private browser window.
 2. Record a video of no more than 10 minutes: a client walkthrough (up to 5 minutes), followed by an internal technical walkthrough (up to 5 minutes).
 3. Open every submitted URL in a private/incognito browser window and verify access.
 4. Submit the repository, deployed app, and video links in the provided form.
