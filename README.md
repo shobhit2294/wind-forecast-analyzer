@@ -21,6 +21,9 @@ Metrics are calculated only for pairs with both an actual and a qualifying forec
 
 | Path | Purpose |
 |---|---|
+| `vercel.json` | Vercel deployment manifest: builds frontend and routes `/api` to Python serverless function. |
+| `api/index.py` | Vercel serverless entrypoint importing the FastAPI application. |
+| `requirements.txt` | Root Python dependencies for Vercel deployment (`fastapi`, `uvicorn`, `httpx`). |
 | `frontend/src/App.jsx` | Dashboard state, API request, and the page-level component layout. |
 | `frontend/src/components/` | One file per visible dashboard section: header, controls, error notice, metric cards, chart, trading insight, interval table, and footer. |
 | `frontend/src/utils/formatters.js` | Shared number, time, and request-error formatting helpers. |
@@ -31,7 +34,7 @@ Metrics are calculated only for pairs with both an actual and a qualifying forec
 | `frontend/` | Vite configuration, dependencies, and frontend Docker build. |
 | `backend/app/main.py` | FastAPI routes, Elexon retrieval, in-memory caching, forecast selection, and error scoring. |
 | `backend/tests/test_analysis.py` | Unit tests for forecast selection, metrics, Elexon request windows, caching, and date validation. |
-| `Dockerfile` | Builds the combined production image for a one-service Heroku/container deployment. |
+| `Dockerfile` | Builds the combined production container image. |
 | `.dockerignore` | Excludes local dependencies, builds, and secrets from the combined image. |
 | `docker-compose.yml` | Starts separate frontend and backend containers for local development. |
 | `backend/Dockerfile`, `frontend/Dockerfile` | Build frontend and backend separately for Compose or multi-service hosting. |
@@ -48,7 +51,18 @@ Metrics are calculated only for pairs with both an actual and a qualifying forec
 - `ErrorBanner.jsx` — visible API error message.
 - `PageFooter.jsx` — dashboard footer.
 
-## Start the application
+## Free Deployment on Vercel
+
+The application is configured for free 1-click deployment on [Vercel](https://vercel.com):
+
+1. Log in to [vercel.com](https://vercel.com) using your GitHub account.
+2. Click **Add New...** → **Project**.
+3. Import the `wind-forecast-analyzer` repository.
+4. Keep the default settings (Vercel automatically detects `vercel.json` for both the Vite React build and Python API routes).
+5. Click **Deploy**.
+6. Once deployed, Vercel gives you a public `https://your-project.vercel.app` URL with both the frontend dashboard and `/api/analysis` live.
+
+## Start the application locally
 
 ### Docker (recommended)
 
@@ -61,17 +75,6 @@ docker compose up --build
 Open [http://localhost:8080](http://localhost:8080). The backend service root explains its routes; the API health check is at [http://localhost:8000/api/health](http://localhost:8000/api/health), and interactive API documentation is at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 If a host port is already in use, copy `.env.example` to `.env` and change `BACKEND_HOST_PORT` or `FRONTEND_HOST_PORT`. For example, setting them to `18000` and `18080` makes the app available at [http://localhost:18080](http://localhost:18080), with backend health at [http://localhost:18000/api/health](http://localhost:18000/api/health). These host port settings do not change the internal `8000` backend and `80` frontend ports used between containers.
-
-### One-container production check
-
-The root `Dockerfile` builds the React app and packages it with FastAPI in one image. FastAPI serves the React page at `/` and continues to serve analysis at `/api/analysis`, so the browser and API share one origin and require no separate backend URL.
-
-```powershell
-docker build -t wind-forecast-app .
-docker run --rm -p 18001:8000 wind-forecast-app
-```
-
-Open [http://localhost:18001](http://localhost:18001) and verify [http://localhost:18001/api/health](http://localhost:18001/api/health) returns `{"status":"ok"}`. Choose another unused host port instead of `18001` if necessary.
 
 ### Local development
 
@@ -123,22 +126,7 @@ All 9 unit tests verify:
 
 ## Architecture and review notes
 
-The browser calls a same-origin `/api` route. FastAPI fetches only the two Elexon datasets, validates and filters records, chooses a qualifying forecast vintage per interval, and computes metrics. The React layer renders the response and does not calculate alternate metrics. The Docker frontend serves a built static bundle with Nginx and proxies `/api` to the backend service.
-
-### Deploying both together on Heroku
-
-Use the **root `Dockerfile`** to deploy one web service containing both React and FastAPI. This avoids separate-service ports and frontend-to-backend DNS configuration. Install the Heroku CLI, sign in, and use a unique app name:
-
-```powershell
-heroku login
-heroku create your-unique-app-name
-heroku container:login
-heroku container:push web --app your-unique-app-name
-heroku container:release web --app your-unique-app-name
-heroku open --app your-unique-app-name
-```
-
-Heroku supplies the runtime `PORT`; the container binds FastAPI to that port. Check `https://your-unique-app-name.herokuapp.com/api/health` for `{"status":"ok"}`. The frontend is served from the app root and calls `/api/analysis` on that same service.
+The browser calls a same-origin `/api` route. On Vercel, requests to `/api/*` are handled by Python serverless functions via `api/index.py`, while frontend assets are served from `frontend/dist`. FastAPI fetches only the two Elexon datasets, validates and filters records, chooses a qualifying forecast vintage per interval, and computes metrics. The React layer renders the response and does not calculate alternate metrics.
 
 AI tools were used to assist with creating this prototype. The code and data interpretation should be reviewed and validated before operational use.
 
@@ -146,9 +134,7 @@ AI tools were used to assist with creating this prototype. The code and data int
 
 Repository: [github.com/shobhit2294/wind-forecast-analyzer](https://github.com/shobhit2294/wind-forecast-analyzer).
 
-The source is verified as a combined Docker image locally.
-
-1. Deploy the combined Docker image and verify `/api/health` and the dashboard in a private browser window.
+1. Deploy the app to Vercel and verify `/api/health` and the dashboard in a private browser window.
 2. Record a video of no more than 10 minutes: a client walkthrough (up to 5 minutes), followed by an internal technical walkthrough (up to 5 minutes).
 3. Open every submitted URL in a private/incognito browser window and verify access.
 4. Submit the repository, deployed app, and video links in the provided form.
