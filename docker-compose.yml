@@ -5,7 +5,7 @@ services:
     environment:
       ELEXON_API_BASE: ${ELEXON_API_BASE:-https://data.elexon.co.uk/bmrs/api/v1/datasets}
     ports:
-      - "8000:8000"
+      - "${BACKEND_HOST_PORT:-8000}:8000"
     restart: unless-stopped
 
   frontend:
@@ -16,5 +16,5 @@ services:
     environment:
       BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
     ports:
-      - "8080:80"
+      - "${FRONTEND_HOST_PORT:-8080}:80"
     restart: unless-stopped

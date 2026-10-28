@@ -57,6 +57,8 @@ docker compose up --build
 
 Open [http://localhost:8080](http://localhost:8080). The backend service root explains its routes; the API health check is at [http://localhost:8000/api/health](http://localhost:8000/api/health), and interactive API documentation is at [http://localhost:8000/docs](http://localhost:8000/docs).
 
+If a host port is already in use, copy `.env.example` to `.env` and change `BACKEND_HOST_PORT` or `FRONTEND_HOST_PORT`. For example, setting them to `18000` and `18080` makes the app available at [http://localhost:18080](http://localhost:18080), with backend health at [http://localhost:18000/api/health](http://localhost:18000/api/health). These host port settings do not change the internal `8000` backend and `80` frontend ports used between containers.
+
 ### Local development
 
 Backend, in one terminal:
