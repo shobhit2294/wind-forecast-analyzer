@@ -1,142 +1,103 @@
-# wind-forecast-analyzer
+# UK Wind Forecast Analyzer
 
-Northstar | Wind Forecast Desk
+A web application built for UK energy trading desks to evaluate day-ahead wind generation forecasts against actual outturn from Elexon BMRS for January 2026.
 
-A React and FastAPI pilot dashboard for reviewing UK national wind generation forecasts and measuring their accuracy against Elexon actuals for January 2026.
+**Live Application**: [https://wind-forecast-analyzer-tuu4.vercel.app](https://wind-forecast-analyzer-tuu4.vercel.app)  
+**API Health**: [https://wind-forecast-analyzer-tuu4.vercel.app/api/health](https://wind-forecast-analyzer-tuu4.vercel.app/api/health)
 
-> Scope note: This prototype uses only Elexon's national wind datasets. It does not have consumer demand, portfolio positions, prices, or thermal availability, so it cannot calculate a complete procurement requirement. The forecast cutoff is an explicit pilot assumption and should be confirmed with the trading desk before operational use.
+---
 
-## What it does
+## Overview
 
-- Select a January 2026 delivery date and a day-ahead decision cutoff (default: 10:00 UTC on the preceding day, matching the UK EPEX SPOT / Nord Pool auction preparation window).
-- Supports delivery dates from 2026-01-01 through 2026-02-01 (covering all purchase decisions made in January 2026, through 2026-01-31).
-- For each delivery interval, select the latest WINDFOR forecast published at or before that cutoff (guaranteeing zero lookahead bias).
-- Match forecast intervals to FUELHH actuals by `startTime`.
-- Report matched-interval count, MAE, RMSE, and signed bias; plot forecast and actual generation in MW.
-- Export the selected day's matched intervals as CSV.
+UK energy suppliers buying electricity on the wholesale day-ahead market must procure residual demand (total consumer demand minus available renewable generation). Because day-ahead auction order books close at 11:00 UTC on $D-1$, trading decisions rely heavily on wind generation forecasts available prior to gate closure.
 
-Metrics are calculated only for pairs with both an actual and a qualifying forecast. Bias is `forecast - actual`; positive bias indicates over-forecasting. No MAPE is shown because it becomes misleading or undefined for zero/very low generation.
+This dashboard helps traders:
+1. **Reconstruct the decision state**: For any delivery date in January 2026, view the latest wind forecast available at the day-ahead decision cutoff (default 10:00 UTC on $D-1$), eliminating lookahead bias.
+2. **Quantify forecast error**: Measure Mean Absolute Error (MAE), Root Mean Square Error (RMSE), and signed Forecast Bias ($\text{Forecast} - \text{Actual}$) against Elexon outturn data.
+3. **Inspect and export intervals**: Review interval-by-interval forecast vs actual values and export the reconciled ledger as CSV.
 
-## Files and directories
+---
 
-| Path | Purpose |
-|---|---|
-| `vercel.json` | Vercel deployment manifest: builds frontend and routes `/api` to Python serverless function. |
-| `api/index.py` | Vercel serverless entrypoint importing the FastAPI application. |
-| `requirements.txt` | Root Python dependencies for Vercel deployment (`fastapi`, `uvicorn`, `httpx`). |
-| `frontend/src/App.jsx` | Dashboard state, API request, and the page-level component layout. |
-| `frontend/src/components/` | One file per visible dashboard section: header, controls, error notice, metric cards, chart, trading insight, interval table, and footer. |
-| `frontend/src/utils/formatters.js` | Shared number, time, and request-error formatting helpers. |
-| `frontend/src/utils/exportCsv.js` | Creates and downloads the interval CSV file. |
-| `frontend/src/styles.css` | Shared dashboard styles and responsive layouts for all components. |
-| `frontend/src/main.jsx` | React application entry point. |
-| `frontend/nginx.conf.template` | Proxies browser API requests to the configured backend service URL. |
-| `frontend/` | Vite configuration, dependencies, and frontend Docker build. |
-| `backend/app/main.py` | FastAPI routes, Elexon retrieval, in-memory caching, forecast selection, and error scoring. |
-| `backend/tests/test_analysis.py` | Unit tests for forecast selection, metrics, Elexon request windows, caching, and date validation. |
-| `Dockerfile` | Builds the combined production container image. |
-| `.dockerignore` | Excludes local dependencies, builds, and secrets from the combined image. |
-| `docker-compose.yml` | Starts separate frontend and backend containers for local development. |
-| `backend/Dockerfile`, `frontend/Dockerfile` | Build frontend and backend separately for Compose or multi-service hosting. |
-| `.env.example` | Example Elexon URL, frontend proxy URL, and local host ports. |
+## Project Structure
 
-### Frontend component guide
+| Path | Description |
+| :--- | :--- |
+| `frontend/` | React 18 frontend built with Vite and pure SVG charting (no heavy chart libraries). |
+| `backend/app/main.py` | FastAPI application handling Elexon API retrieval, forecast vintage selection, in-memory caching, and error metrics. |
+| `backend/tests/` | Unit test suite verifying vintage selection, cutoff boundaries, and metric calculations. |
+| `api/index.py` | Serverless Python entrypoint for Vercel deployment. |
+| `vercel.json` | Vercel routing configuration for the React SPA and Python serverless API. |
+| `Dockerfile` | Multi-stage production container build (Vite frontend + FastAPI backend). |
+| `docker-compose.yml` | Local development orchestration for frontend and backend containers. |
 
-- `DashboardHeader.jsx` — brand, pilot status, and page title.
-- `DecisionControls.jsx` — delivery date, day-ahead cutoff (with clear D-1 decision date indicator), and scope note.
-- `ForecastSummary.jsx` and `MetricCard.jsx` — data coverage and accuracy metrics.
-- `ForecastChartPanel.jsx` and `WindChart.jsx` — chart heading, legend, and SVG plot.
-- `InsightsPanel.jsx` — signed-bias trading context.
-- `IntervalTable.jsx` — per-interval values and CSV export button.
-- `ErrorBanner.jsx` — visible API error message.
-- `PageFooter.jsx` — dashboard footer.
+---
 
-## Free Deployment on Vercel
+## How to Run
 
-The application is configured for free 1-click deployment on [Vercel](https://vercel.com):
+### 1. Using Docker (Recommended)
 
-1. Log in to [vercel.com](https://vercel.com) using your GitHub account.
-2. Click **Add New...** → **Project**.
-3. Import the `wind-forecast-analyzer` repository.
-4. Keep the default settings (Vercel automatically detects `vercel.json` for both the Vite React build and Python API routes).
-5. Click **Deploy**.
-6. Once deployed, Vercel gives you a public `https://your-project.vercel.app` URL with both the frontend dashboard and `/api/analysis` live.
+From the project root:
 
-## Start the application locally
-
-### Docker (recommended)
-
-From the repository root:
-
-```powershell
+```bash
 docker compose up --build
 ```
 
-Open [http://localhost:8080](http://localhost:8080). The backend service root explains its routes; the API health check is at [http://localhost:8000/api/health](http://localhost:8000/api/health), and interactive API documentation is at [http://localhost:8000/docs](http://localhost:8000/docs).
+- Frontend: [http://localhost:8080](http://localhost:8080)
+- Backend API: [http://localhost:8000/api/health](http://localhost:8000/api/health)
+- API Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-If a host port is already in use, copy `.env.example` to `.env` and change `BACKEND_HOST_PORT` or `FRONTEND_HOST_PORT`. For example, setting them to `18000` and `18080` makes the app available at [http://localhost:18080](http://localhost:18080), with backend health at [http://localhost:18000/api/health](http://localhost:18000/api/health). These host port settings do not change the internal `8000` backend and `80` frontend ports used between containers.
+*(To change local host ports, copy `.env.example` to `.env` and set `BACKEND_HOST_PORT` or `FRONTEND_HOST_PORT`.)*
 
-### Local development
+### 2. Local Development Without Docker
 
-Backend, in one terminal:
-
-```powershell
+**Backend (Python 3.12):**
+```bash
 cd backend
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+source .venv/bin/activate  # On Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-Frontend, in another terminal:
-
-```powershell
+**Frontend (Node 20+):**
+```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Open the Vite URL printed in the terminal. The development server proxies `/api` requests to `http://localhost:8000`.
+Open the local Vite URL (default: `http://localhost:5173`). Requests to `/api` are automatically proxied to the FastAPI server.
 
-### Tests
+---
 
-```powershell
+## Running Tests
+
+Run the backend unit tests:
+
+```bash
 cd backend
 python -m unittest discover -s tests -v
 ```
 
-All 9 unit tests verify:
-- Latest forecast vintage selection prior to cutoff
-- Zero lookahead bias
-- MAE, RMSE, and Signed Bias calculations
-- Handling of null/empty matches
-- Elexon 7-day API chunking
-- January decision boundary enforcement (including Feb 1 for Jan 31 decisions)
-- In-memory dataset caching
+The 9 unit tests verify:
+- Correct vintage selection before the cutoff timestamp.
+- Strict enforcement of zero lookahead bias.
+- Metric calculation formulas (MAE, RMSE, Bias).
+- Handling of unmatched or missing intervals.
+- 7-day query window partitioning for Elexon BMRS.
+- In-memory dataset caching.
 
-## Data sources and interpretation
+---
 
-- Actual generation: [Elexon FUELHH](https://bmrs.elexon.co.uk/api-documentation/endpoint/datasets/FUELHH/stream), filtered to `fuelType=WIND`.
-- Forecast generation: [Elexon WINDFOR](https://bmrs.elexon.co.uk/api-documentation/endpoint/datasets/WINDFOR/stream).
-- API host: `https://data.elexon.co.uk/bmrs/api/v1/datasets`.
-- The backend requests FUELHH actuals published on the selected delivery date and WINDFOR forecasts published in a rolling window up through the decision cutoff. Queries are cached in memory for sub-100ms response times on repeat requests.
-- Live checks for January 2026 return 48 FUELHH half-hour actual intervals and 24 WINDFOR forecast intervals per day. This matches the UK market structure where the Day-Ahead Auction trades 24 hourly products, while settlement periods are half-hourly.
-- Forecast and actual values are paired on exact `startTime` matches (24 matched intervals). Unmatched half-hours are preserved and highlighted in the ledger as coverage indicators.
-- All displayed times are UTC.
+## Data & Methodology
 
-## Architecture and review notes
+- **Actual Generation**: [Elexon FUELHH](https://bmrs.elexon.co.uk/api-documentation/endpoint/datasets/FUELHH/stream) filtered to `fuelType == "WIND"`. Data has half-hourly resolution (48 settlement periods/day).
+- **Forecast Generation**: [Elexon WINDFOR](https://bmrs.elexon.co.uk/api-documentation/endpoint/datasets/WINDFOR/stream). Data has hourly resolution (24 points/day), matching the UK Day-Ahead hourly auction contracts.
+- **Timestamp Matching**: Forecast and actual records are matched on exact UTC `startTime`. The 24 hourly points produce 24 matched pairs; the remaining half-hourly periods are retained in the ledger as coverage indicators without interpolation.
+- **Decision Window**: Supports purchase decisions made throughout January 2026 (including 1 February 2026 delivery for the 31 January decision).
 
-The browser calls a same-origin `/api` route. On Vercel, requests to `/api/*` are handled by Python serverless functions via `api/index.py`, while frontend assets are served from `frontend/dist`. FastAPI fetches only the two Elexon datasets, validates and filters records, chooses a qualifying forecast vintage per interval, and computes metrics. The React layer renders the response and does not calculate alternate metrics.
+---
 
-AI tools were used to assist with creating this prototype. The code and data interpretation should be reviewed and validated before operational use.
+## AI Disclosure
 
-## Deployment and submission
-
-- **Live Application**: [https://wind-forecast-analyzer-tuu4.vercel.app](https://wind-forecast-analyzer-tuu4.vercel.app)
-- **API Health Check**: [https://wind-forecast-analyzer-tuu4.vercel.app/api/health](https://wind-forecast-analyzer-tuu4.vercel.app/api/health)
-- **Repository**: [https://github.com/shobhit2294/wind-forecast-analyzer](https://github.com/shobhit2294/wind-forecast-analyzer)
-
-1. Verify `/api/health` and the dashboard in a private browser window.
-2. Record a video of no more than 10 minutes: a client walkthrough (up to 5 minutes), followed by an internal technical walkthrough (up to 5 minutes).
-3. Open every submitted URL in a private/incognito browser window and verify access.
-4. Submit the repository, deployed app, and video links in the provided form.
+AI development tools (Claude / ChatGPT / Gemini) were used to assist in drafting initial boilerplate, tests, and documentation for this prototype. All domain logic, calculations, and Elexon API integrations were verified against live data.
